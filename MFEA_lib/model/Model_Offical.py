@@ -304,6 +304,8 @@ class model(AbstractModel.model):
         INIT_RMP = 0.5
         self.J = 0.3
         ELITE_SIZE = 10
+        TIME_TO_INCREASE_EXPLOITATION = 500
+        MUTATION_RATE = 0.9
 
         # Initialize the parameter
         num_tasks = len(self.tasks)
@@ -343,14 +345,23 @@ class model(AbstractModel.model):
         epoch = 1
         eval_k = np.zeros(len(self.tasks))
         nb_inds_tasks = [nb_inds_each_task] * len(self.tasks)
-        # stop = False
-        # while (self.count_evals < self.max_evals and (not stop)):
-        while np.sum(eval_k) < MAX_EVALS_PER_TASK*len(self.tasks):
-            # stop = True
+        done = [False] * num_tasks
+        stop = False
+        while np.sum(eval_k) < MAX_EVALS_PER_TASK*num_tasks and stop == False:
+            num_task_done = 0
+            for t in range(num_tasks) :
+                if done[t] == True :
+                    num_task_done += 1
+            if num_task_done == num_tasks :
+                epoch = nb_generations
+                self.history_cost.append([ind.fcost for ind in population.get_solves()])
+                self.render_process(epoch/nb_generations, ['Pop_size', 'Cost'], [[len(population)], self.history_cost[-1]], use_sys= True)
+                epoch +=1
+                stop = True
+                break
             for t in range(num_tasks):
-                if population[t].__getBestIndividual__.fcost < EPSILON:
-                    continue
-                if eval_k[t] >= MAX_EVALS_PER_TASK :
+                if population[t].__getBestIndividual__.fcost < EPSILON or np.sum(eval_k) + len(population[t].ls_inds) > MAX_EVALS_PER_TASK*num_tasks :
+                    done[t] = True
                     continue
                 offsprings = SubPopulation(
                     IndClass=self.IndClass,
@@ -362,7 +373,7 @@ class model(AbstractModel.model):
                 for indiv in population[t]:
                     other_t = np.random.randint(num_tasks)
                     if other_t == t:
-                        if random.random() < 0.9 :
+                        if random.random() < MUTATION_RATE :
                             offsprings.__addIndividual__(self.current_to_pbest(population[t], t, indiv))
                         else :
                             offsprings.__addIndividual__(self.rand_1(population[t], t, indiv))
@@ -400,18 +411,17 @@ class model(AbstractModel.model):
                             eval_k[t]+=2
                         else:
                             # Intra - crossover
-                            if random.random() < 0.9 :
+                            if random.random() < MUTATION_RATE :
                                 offsprings.__addIndividual__(self.current_to_pbest(population[t], t, indiv))
                             else :
                                 offsprings.__addIndividual__(self.rand_1(population[t], t, indiv))
                             eval_k[t]+=1
             
-                if epoch > 500 and eval_k[t] + ELITE_SIZE < MAX_EVALS_PER_TASK :
-                    elite_size = min(10, len(population[t].ls_inds), len(offsprings))
+                if epoch > TIME_TO_INCREASE_EXPLOITATION and np.sum(eval_k) + ELITE_SIZE < MAX_EVALS_PER_TASK*num_tasks :
+                    elite_size = min(10, len(population[t].ls_inds))
                     if elite_size%2 == 1 : 
                         elite_size -= 1
                     elite_set = self.get_elite(population[t],elite_size)
-                    # elite_set = self.get_elite(offsprings,elite_size)
                     random.shuffle(elite_set)
                     if epoch %2 == 0 :
                         for j in range(int(elite_size/2)) :
@@ -438,7 +448,7 @@ class model(AbstractModel.model):
                             indiv.fcost = self.tasks[t](genes)
                             offsprings.__addIndividual__(indiv)
                             eval_k[t] += 1
-                if np.random.rand() < self.J and eval_k[t] + len(offsprings) <= MAX_EVALS_PER_TASK :
+                if np.random.rand() < self.J and np.sum(eval_k) + len(offsprings) < MAX_EVALS_PER_TASK*num_tasks :
                     a = np.amax(offsprings.ls_inds,axis= 0)
                     b = np.amin(offsprings.ls_inds,axis= 0)
                     op_offsprings = SubPopulation(
@@ -456,33 +466,28 @@ class model(AbstractModel.model):
                         if eval_k[t] >= MAX_EVALS_PER_TASK :
                             break
                     offsprings  = offsprings+op_offsprings 
-                # offsprings.update_rank()
-                # self.selection(offsprings,nb_inds_tasks[t])
+
                 population.ls_subPop[t] = offsprings 
-                if eval_k[t] + nb_inds_tasks[t] > MAX_EVALS_PER_TASK :
-                    eval_k[t] = MAX_EVALS_PER_TASK 
 
                 # Update RMP, F, CR, population size
                 self.update_state(population[t], t)
             if LSA is True: 
                 nb_inds_tasks = [int(
-                    # (nb_inds_min - nb_inds_each_task) / nb_generations * (epoch - 1) + nb_inds_each_task
                     int(min((nb_inds_min - nb_inds_each_task)/(nb_generations - 1)* (epoch - 1) + nb_inds_each_task, nb_inds_each_task))
-                )] * len(self.tasks)
+                )] * num_tasks
 
             population.update_rank()
             self.selection(population, nb_inds_tasks)
             self.history_cost.append([indiv.fcost for indiv in population.get_solves()])
-            if np.sum(eval_k) >= epoch * nb_inds_each_task * len(self.tasks):
+            if np.sum(eval_k) >= epoch * nb_inds_each_task * num_tasks:
                 # save history
                 self.history_cost.append([ind.fcost for ind in population.get_solves()])
                 self.render_process(epoch/nb_generations, ['Pop_size', 'Cost'], [[len(population)], self.history_cost[-1]], use_sys= True)
                 epoch +=1
-            if np.sum(eval_k) >= nb_generations * nb_inds_each_task * len(self.tasks):
+            if np.sum(eval_k) >= MAX_EVALS_PER_TASK * num_tasks:
                 epoch = nb_generations
                 # save history
                 self.history_cost.append([ind.fcost for ind in population.get_solves()])
                 self.render_process(epoch/nb_generations, ['Pop_size', 'Cost'], [[len(population)], self.history_cost[-1]], use_sys= True)
-                epoch +=1
         self.last_pop = population
         return self.last_pop.get_solves()

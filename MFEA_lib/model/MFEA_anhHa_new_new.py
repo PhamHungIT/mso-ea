@@ -44,7 +44,7 @@ class model(AbstractModel.model):
                 break
         if f > 1:
             f = 1
-        
+         
         
         pbest_size = int(self.BEST_RATE * len(sub_pop))
         if pbest_size < 2 :

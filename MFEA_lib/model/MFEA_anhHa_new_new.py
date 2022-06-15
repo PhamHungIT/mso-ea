@@ -47,20 +47,15 @@ class model(AbstractModel.model):
         
         
         pbest_size = int(self.BEST_RATE * len(sub_pop))
+        if pbest_size < 2 :
+            pbest_size = 2
         idx_elites = np.argsort(sub_pop.factorial_rank)[:pbest_size]
         
-        # pbest = curr_indiv
-        # while pbest == curr_indiv:
         pbest = sub_pop[np.random.choice(idx_elites)]
-
-        r1 = curr_indiv
-        # while r1 == curr_indiv or r1 == pbest:
         r1 = sub_pop.__getRandomItems__()
         if self.update_time[id_task] > 0 and np.random.rand() <= len(self.archive[id_task]) / (len(self.archive[id_task]) + len(sub_pop)):
             r2 = self.archive[id_task][np.random.randint(len(self.archive[id_task]))]
         else:
-            r2 = curr_indiv
-            # while r2 == curr_indiv or r2 == r1 or r2 == pbest:
             r2 = sub_pop.__getRandomItems__()
         
         j_rand = np.random.randint(len(curr_indiv))
@@ -68,6 +63,76 @@ class model(AbstractModel.model):
         for j in range(len(curr_indiv)):
             if np.random.rand() <= cr or j == j_rand:
                 temp_genes[j] = curr_indiv[j] + f * (pbest[j] - curr_indiv[j] + r1[j] - r2[j])
+                # bound handling
+                if temp_genes[j] > 1:
+                    temp_genes[j] = (curr_indiv[j] + 1)/2
+                elif temp_genes[j] < 0:
+                    temp_genes[j] = (curr_indiv[j] + 0)/2
+            else:
+                temp_genes[j] = curr_indiv[j]
+        child = self.IndClass(temp_genes)
+        child.fcost = sub_pop.task(child.genes)
+        child.skill_factor = id_task
+        self.count_evals += 1
+        
+        if child.fcost == curr_indiv.fcost:
+            return child
+        elif child.fcost < curr_indiv.fcost:
+            self.success_cr[id_task].append(cr)
+            self.success_f[id_task].append(f)
+            self.diff_fitness[id_task].append(curr_indiv.fcost - child.fcost)
+            if len(self.archive[id_task]) < self.ARC_RATE * len(sub_pop):
+                self.archive[id_task].append(curr_indiv)
+            else:
+                self.archive[id_task].pop(np.random.randint(len(self.archive[id_task])))
+                self.archive[id_task].append(curr_indiv)
+            return child
+        else:
+            return curr_indiv
+
+    def pbest_1(self, sub_pop: SubPopulation, id_task: int , curr_indiv: Individual) -> Individual:
+        rand_pos = np.random.randint(self.H)
+        mu_cr = self.mem_cr[id_task,rand_pos]
+        mu_f = self.mem_f[id_task, rand_pos]
+
+        if (mu_cr == -1):
+            cr = 0
+        else:
+            cr = np.clip(np.random.normal(loc=mu_cr, scale=0.1), 0, 1)
+            
+        while True:
+            f = self.cauchy_g(mu_f, gamma=0.1)
+            if f > 0:
+                break
+        if f > 1:
+            f = 1
+        
+        pbest_size = int(self.BEST_RATE * len(sub_pop))
+        if pbest_size < 2 :
+            pbest_size = 2
+        idx_elites = np.argsort(sub_pop.factorial_rank)[:pbest_size]
+        
+        pbest = sub_pop[np.random.choice(idx_elites)]
+        r1 = sub_pop.__getRandomItems__()
+        if self.update_time[id_task] > 0 and np.random.rand() <= len(self.archive[id_task]) / (len(self.archive[id_task]) + len(sub_pop)):
+            r2 = r1
+            num_choice = 0
+            while r2 == r1 and num_choice < 10 :
+                r2 = self.archive[id_task][np.random.randint(len(self.archive[id_task]))]
+                num_choice += 1
+        else:
+            # r2 = sub_pop.__getRandomItems__()
+            r2 = r1
+            num_choice = 0
+            while r2 == r1 and num_choice < 10 :
+                r2 = sub_pop.__getRandomItems__()
+                num_choice += 1
+        
+        j_rand = np.random.randint(len(curr_indiv))
+        temp_genes = np.random.rand(len(curr_indiv))
+        for j in range(len(curr_indiv)):
+            if np.random.rand() <= cr or j == j_rand:
+                temp_genes[j] = pbest[j] + f * (r1[j] - r2[j])
                 # bound handling
                 if temp_genes[j] > 1:
                     temp_genes[j] = (curr_indiv[j] + 1)/2
@@ -112,15 +177,11 @@ class model(AbstractModel.model):
         if f > 1:
             f = 1
 
-        r1 = curr_indiv
-        # while r1 == curr_indiv or r1 == pbest:
         r1 = sub_pop.__getRandomItems__()
         r3 = sub_pop.__getRandomItems__()
         if self.update_time[id_task] > 0 and np.random.rand() <= len(self.archive[id_task]) / (len(self.archive[id_task]) + len(sub_pop)):
             r2 = self.archive[id_task][np.random.randint(len(self.archive[id_task]))]
         else:
-            r2 = curr_indiv
-            # while r2 == curr_indiv or r2 == r1 or r2 == pbest:
             r2 = sub_pop.__getRandomItems__()
         
         j_rand = np.random.randint(len(curr_indiv))
@@ -154,16 +215,6 @@ class model(AbstractModel.model):
             return child
         else:
             return curr_indiv
-    def Uniform_Crossover(self, pa: Individual, pb: Individual, skf_oa= None) -> Individual:
-        genes = np.zeros(self.dim_uss)
-        for i in range(self.dim_uss) :
-            if np.random.random() < 0.5 :
-                genes[i] = pa.genes[i]
-            else : 
-                genes[i] = pb.genes[i]
-        oa = self.IndClass(genes)
-        oa.skill_factor = skf_oa
-        return oa
     def update_state(self, sub_pop: SubPopulation, id_task: int):
         self.update_time[id_task] += 1
 
@@ -252,6 +303,7 @@ class model(AbstractModel.model):
         self.C = 0.02
         INIT_RMP = 0.5
         self.J = 0.3
+        ELITE_SIZE = 10
 
         # Initialize the parameter
         num_tasks = len(self.tasks)
@@ -293,10 +345,12 @@ class model(AbstractModel.model):
         nb_inds_tasks = [nb_inds_each_task] * len(self.tasks)
         # stop = False
         # while (self.count_evals < self.max_evals and (not stop)):
-        while np.sum(eval_k) <= MAX_EVALS_PER_TASK*len(self.tasks):
+        while np.sum(eval_k) < MAX_EVALS_PER_TASK*len(self.tasks):
             # stop = True
             for t in range(num_tasks):
                 if population[t].__getBestIndividual__.fcost < EPSILON:
+                    continue
+                if eval_k[t] >= MAX_EVALS_PER_TASK :
                     continue
                 offsprings = SubPopulation(
                     IndClass=self.IndClass,
@@ -312,6 +366,7 @@ class model(AbstractModel.model):
                             offsprings.__addIndividual__(self.current_to_pbest(population[t], t, indiv))
                         else :
                             offsprings.__addIndividual__(self.rand_1(population[t], t, indiv))
+                        eval_k[t]+=1
                     else:
                         if self.best_partner[t] == other_t:
                             rmp = 1
@@ -323,7 +378,6 @@ class model(AbstractModel.model):
                                     break
                         if np.random.rand() <= rmp:
                             # Inter-task crossover
-                            eval_k[t]+=1
                             other_indiv = population[other_task].__getRandomItems__()
                             oa, ob = self.crossover(indiv, other_indiv, t, t)
                             oa.fcost  = self.tasks[t](oa.genes)
@@ -343,31 +397,39 @@ class model(AbstractModel.model):
                                 offsprings.__addIndividual__(survival)
                             else:
                                 offsprings.__addIndividual__(indiv) 
+                            eval_k[t]+=2
                         else:
                             # Intra - crossover
                             if random.random() < 0.9 :
                                 offsprings.__addIndividual__(self.current_to_pbest(population[t], t, indiv))
                             else :
                                 offsprings.__addIndividual__(self.rand_1(population[t], t, indiv))
-                    eval_k[t]+=1
-                if epoch > 500 :
-                    top10 = self.get_elite(population[t],10)
-                    random.shuffle(top10)
+                            eval_k[t]+=1
+            
+                if epoch > 500 and eval_k[t] + ELITE_SIZE < MAX_EVALS_PER_TASK :
+                    elite_size = min(10, len(population[t].ls_inds), len(offsprings))
+                    if elite_size%2 == 1 : 
+                        elite_size -= 1
+                    elite_set = self.get_elite(population[t],elite_size)
+                    # elite_set = self.get_elite(offsprings,elite_size)
+                    random.shuffle(elite_set)
                     if epoch %2 == 0 :
-                        for j in range(5) :
-                            oa,ob = self.crossover(top10[j], top10[j+5], t, t)
+                        for j in range(int(elite_size/2)) :
+                            oa,ob = self.crossover(elite_set[j], elite_set[j+int(elite_size/2)], t, t)
                             oa.fcost  = self.tasks[t](oa.genes)
                             ob.fcost  = self.tasks[t](ob.genes)
                             offsprings.__addIndividual__(oa)
                             offsprings.__addIndividual__(ob)
                             eval_k[t]+=2
+                            if eval_k[t] >= MAX_EVALS_PER_TASK :
+                                break
                     else :
-                        subpop_elite = np.zeros([10, self.dim_uss])
-                        for j in range(10) :
-                            subpop_elite[j] = top10[j].genes
+                        subpop_elite = np.zeros([len(elite_set), self.dim_uss])
+                        for j in range(elite_size) :
+                            subpop_elite[j] = elite_set[j].genes
                         mean = np.mean(subpop_elite, axis = 0)
                         std = np.std(subpop_elite, axis = 0)
-                        for j in range(10) :
+                        for j in range(elite_size) :
                             genes = np.zeros(self.dim_uss)
                             for l in range(self.dim_uss) :
                                 genes[l] = np.random.normal(loc = mean[l], scale = std[l])
@@ -376,7 +438,7 @@ class model(AbstractModel.model):
                             indiv.fcost = self.tasks[t](genes)
                             offsprings.__addIndividual__(indiv)
                             eval_k[t] += 1
-                if np.random.rand() < self.J:
+                if np.random.rand() < self.J and eval_k[t] + len(offsprings) <= MAX_EVALS_PER_TASK :
                     a = np.amax(offsprings.ls_inds,axis= 0)
                     b = np.amin(offsprings.ls_inds,axis= 0)
                     op_offsprings = SubPopulation(
@@ -391,10 +453,14 @@ class model(AbstractModel.model):
                         oa.fcost = self.tasks[t](oa.genes)
                         op_offsprings.__addIndividual__(oa)
                         eval_k[t]+=1
+                        if eval_k[t] >= MAX_EVALS_PER_TASK :
+                            break
                     offsprings  = offsprings+op_offsprings 
                 # offsprings.update_rank()
                 # self.selection(offsprings,nb_inds_tasks[t])
-                population.ls_subPop[t] = offsprings  
+                population.ls_subPop[t] = offsprings 
+                if eval_k[t] + nb_inds_tasks[t] > MAX_EVALS_PER_TASK :
+                    eval_k[t] = MAX_EVALS_PER_TASK 
 
                 # Update RMP, F, CR, population size
                 self.update_state(population[t], t)

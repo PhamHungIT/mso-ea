@@ -1,7 +1,7 @@
 *.mso
-RESULTS/**
-!/RESULTS/__static__/
-!/RESULTS/__static__/**
+model_saved/**
+!/model_saved/__static__/
+!/model_saved/__static__/**
 
 
 # Byte-compiled / optimized / DLL files

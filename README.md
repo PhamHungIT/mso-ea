@@ -41,4 +41,4 @@ The project is in process of update and fix
 ## Contact
 - Phùng Bảo Hà - phungbaoha731@gmail.com
 - Phạm Văn Hùng - phamhung1010.it@gmail.com
-- Đỗ Đức Anh
+- Đỗ Đức Anh - Doducanh2707@gmail.com

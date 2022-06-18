@@ -44,7 +44,7 @@ class model(AbstractModel.model):
                 break
         if f > 1:
             f = 1
-         
+        
         
         pbest_size = int(self.BEST_RATE * len(sub_pop))
         if pbest_size < 2 :
@@ -347,8 +347,6 @@ class model(AbstractModel.model):
         nb_inds_tasks = [nb_inds_each_task] * len(self.tasks)
         done = [False] * num_tasks
         stop = False
-
-        num_eval = 0
         while np.sum(eval_k) < MAX_EVALS_PER_TASK*num_tasks and stop == False:
             num_task_done = 0
             for t in range(num_tasks) :
@@ -480,17 +478,16 @@ class model(AbstractModel.model):
 
             population.update_rank()
             self.selection(population, nb_inds_tasks)
-            if np.sum(eval_k) >= epoch * 1000 * num_tasks:
+            self.history_cost.append([indiv.fcost for indiv in population.get_solves()])
+            if np.sum(eval_k) >= epoch * nb_inds_each_task * num_tasks:
                 # save history
                 self.history_cost.append([ind.fcost for ind in population.get_solves()])
                 self.render_process(epoch/nb_generations, ['Pop_size', 'Cost'], [[len(population)], self.history_cost[-1]], use_sys= True)
                 epoch +=1
-            
             if np.sum(eval_k) >= MAX_EVALS_PER_TASK * num_tasks:
                 epoch = nb_generations
                 # save history
                 self.history_cost.append([ind.fcost for ind in population.get_solves()])
                 self.render_process(epoch/nb_generations, ['Pop_size', 'Cost'], [[len(population)], self.history_cost[-1]], use_sys= True)
-            num_eval = np.sum(eval_k)
         self.last_pop = population
         return self.last_pop.get_solves()

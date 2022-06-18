@@ -472,7 +472,15 @@ class model(AbstractModel.model):
                         task=self.tasks[t]
                     )
                     for inv in offsprings:
-                        oa = self.IndClass(a+b-inv.genes)
+                        r1 = np.random.rand()
+                        r2 = np.random.rand()
+                        r3 = np.random.rand()
+                        if np.random.rand() < 0.5:
+                            genes = inv.genes+ r1(r2(a+b-inv.genes)-inv.genes)
+                        else:
+                            genes = inv.genes+ r3(population.ls_subPop[t].__getRandomItems__().genes-inv.genes)
+                        # oa = self.IndClass(a+b-inv.genes)
+                        oa = self.IndClass(genes)
                         oa.fcost = self.tasks[t](oa.genes)
                         op_offsprings.__addIndividual__(oa)
                         eval_k[t]+=1

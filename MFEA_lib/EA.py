@@ -178,6 +178,16 @@ class SubPopulation:
     def getSolveInd(self):
         return self.ls_inds[int(np.where(self.factorial_rank == 1)[0])]
 
+
+class IndividualDE(Individual):
+    def __init__(self, genes, dim= None) -> None:
+        super().__init__(genes, dim)
+        if genes is None:
+            self.genes: np.ndarray = np.random.rand(dim)
+        self.transfer =False
+        self.d_rank = 1
+
+        
 class Population:
     def __init__(self, IndClass: Type[Individual], dim, nb_inds_tasks: list[int], list_tasks:list[AbstractTask] = [], 
         evaluate_initial_skillFactor = False) -> None:
